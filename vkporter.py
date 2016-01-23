@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 """
     :mod:`vkporter`
@@ -112,6 +113,28 @@ def get_albums(connection):
         print(e)
         return None
 
+gen_page = None
+
+def gen_header(album, output):
+    global gen_page
+    header = """<!DOCTYPE html>
+<html>
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="content-type">
+    <title>%s</title>
+  </head>
+  <body>
+"""
+#    print(album)
+    gen_page = open(os.path.join(output, 'generated.html'), 'w')
+    gen_page.write((header % album['title']).encode('utf8'))
+
+def gen_footer():
+    footer = """  </body>
+</html>
+"""
+    gen_page.write(footer)
+    gen_page.close()
 
 def download_album(connection, output_path, date_format, album, prev_s_len=0):
     if album['id'] == 'user':
@@ -122,6 +145,8 @@ def download_album(connection, output_path, date_format, album, prev_s_len=0):
     output = os.path.join(output_path, album['title'])
     if not os.path.exists(output):
         os.makedirs(output)
+
+    gen_header(album, output)
 
     photos_count = response['count']
     photos = response['items']
@@ -144,6 +169,7 @@ def download_album(connection, output_path, date_format, album, prev_s_len=0):
         # pausing download process every 50 photos
         if processed % 50 == 0:
             time.sleep(1)
+    gen_footer()
 
 
 def get_user_photos(connection):
@@ -180,6 +206,19 @@ def get_photos(connection, album_id):
         print(e)
         return None
 
+def write_gen(photo, title):
+    global gen_page
+    photoline = '''
+      <a href="http://img-fotki.yandex.ru/get/4124/8006109.4e/0_9eba7_cea0eef4_orig"
+        target="_blank"><img alt="" width="800"src="%s.jpg"
+          title="" border="0"></a>
+      <br>
+      <br>
+      %s
+      <br>
+      <br>
+'''
+    gen_page.write(((photoline % (title, photo['text'])) ).encode('utf8') )
 
 def download(photo, output, date_format):
     """Download photo
@@ -188,13 +227,21 @@ def download(photo, output, date_format):
     """
     url = photo.get('photo_2560') or photo.get('photo_1280') or photo.get('photo_807') or photo.get('photo_604') or photo.get('photo_130')
 
-    r = requests.get(url)
     formatted_date = datetime.datetime.fromtimestamp(photo['date']).strftime(date_format)
     title = '%s_%s' % (formatted_date, photo['id'])
-    with open(os.path.join(output, '%s.jpg' % title), 'wb') as f:
-        for buf in r.iter_content(1024):
-            if buf:
-                f.write(buf)
+    path = os.path.join(output, '%s.jpg' % title)
+    need_download = not os.path.isfile(path)
+    #print(path, need_download)
+    if need_download:
+        r = requests.get(url)
+    #print(photo)
+    write_gen(photo, title)
+    #print("text: %s" % photo['text'])
+    if need_download:
+        with open(path, 'wb') as f:
+            for buf in r.iter_content(1024):
+                if buf:
+                    f.write(buf)
 
 
 def sizeof_fmt(num):
