@@ -209,8 +209,10 @@ def get_photos(connection, album_id):
 def write_gen(photo, title):
     global gen_page
     photoline = '''
-      <a href="http://img-fotki.yandex.ru/get/4124/8006109.4e/0_9eba7_cea0eef4_orig"
-        target="_blank"><img alt="" width="800"src="%s.jpg"
+      <a href=""
+
+        target="_blank"><img alt="" width="800"src="%s.jpg"
+
           title="" border="0"></a>
       <br>
       <br>
@@ -303,7 +305,7 @@ if __name__ == '__main__':
                 'id': args.album_id,
                 'title': args.album_id
             }
-            download_album(connection, args.output, args.date_format, album, owner_id=args.owner_id)
+            download_album(connection, args.output, args.date_format, album)
         # download all albums
         else:
             # Request list of photo albums
