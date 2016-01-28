@@ -300,18 +300,24 @@ if __name__ == '__main__':
             sys.exit()
 
         # dowload a particular album
+        # Request list of photo albums
+        albums_response = get_albums(connection)
+        albums_count = albums_response['count']
+        albums = albums_response['items']
         if args.album_id:
-            album = {
-                'id': args.album_id,
-                'title': args.album_id
-            }
+            #find album title
+            album = None
+            for i in albums:
+                if i['id'] == int(args.album_id):
+                    album = i
+                    break
+            if album is None:
+                print 'Album with id ', args.album_id, ' not found'
+                sys.exit(1)
+
             download_album(connection, args.output, args.date_format, album)
         # download all albums
         else:
-            # Request list of photo albums
-            albums_response = get_albums(connection)
-            albums_count = albums_response['count']
-            albums = albums_response['items']
             all_photos_count = 0
 
             print '\n'
@@ -349,5 +355,3 @@ if __name__ == '__main__':
     finally:
         print '\n'
         print("Done in %s" % (datetime.datetime.now() - start_time))
-        #  Clean, del settings file.
-        os.remove(connection.settings.filename)
