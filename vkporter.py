@@ -17,6 +17,7 @@
     :copyright: (c) 2013 by Andrey Maksimov.
     :license: BSD, see LICENSE for more details.
 """
+from string import Template
 
 __author__ = 'Andrey Maksimov <meamka@me.com>, Mr. Vice-Versa'
 __date__ = '15.06.2015'
@@ -29,6 +30,7 @@ from getpass import getpass
 import os
 import time
 import sys
+import templates
 
 try:
     import requests
@@ -115,26 +117,18 @@ def get_albums(connection):
 
 gen_page = None
 
+
 def gen_header(album, output):
     global gen_page
-    header = """<!DOCTYPE html>
-<html>
-  <head>
-    <meta content="text/html; charset=UTF-8" http-equiv="content-type">
-    <title>%s</title>
-  </head>
-  <body>
-"""
 #    print(album)
     gen_page = open(os.path.join(output, 'generated.html'), 'w')
-    gen_page.write((header % album['title']).encode('utf8'))
+    gen_page.write((templates.header % album['title']).encode('utf8'))
+
 
 def gen_footer():
-    footer = """  </body>
-</html>
-"""
-    gen_page.write(footer)
+    gen_page.write(templates.footer)
     gen_page.close()
+
 
 def download_album(connection, output_path, date_format, album, prev_s_len=0):
     if album['id'] == 'user':
@@ -162,7 +156,7 @@ def download_album(connection, output_path, date_format, album, prev_s_len=0):
         prev_s_len = len(output_s)
         sys.stdout.flush()
 
-        download(photo, output, date_format)
+        download(connection, photo, output, date_format)
         processed += 1
 
         # crazy hack to prevent vk.com "Max retries exceeded" error
@@ -206,23 +200,43 @@ def get_photos(connection, album_id):
         print(e)
         return None
 
-def write_gen(photo, title):
+
+def get_comments(connection, photo_id):
+    """Get comments list for specified photo.
+
+    :param connection: :class:`vk_api.vk_api.VkApi` connection
+    :type connection: :class:`vk_api.vk_api.VkApi`
+    :param photo_id: album identifier returned by :func:`get_photos`
+    :type photo_id: int
+
+    :return: list of comments or ``None``
+    :rtype: list
+    """
+    try:
+        return connection.method(
+            'photos.getComments',
+                {'photo_id': photo_id,
+                 'owner_id': connection.owner_id,
+                 'extended': 1
+                 }
+        )
+    except Exception as e:
+        print(e)
+        return None
+
+
+def write_gen(connection, photo, title):
     global gen_page
-    photoline = '''
-      <a href=""
+    gen_page.write((templates.photoline % (title, photo['text'])).encode('utf8') )
+    comments = get_comments(connection, photo['id'])
+    if len(comments['items']) > 0:
+        gen_page.write(Template(templates.comments_begin).substitute(num=len(comments['items'])).encode('utf8'))
+        for comment in comments['items']:
+            gen_page.write(Template(templates.comment_text).substitute(text=comment['text']).encode('utf8'))
+        gen_page.write(templates.comments_end)
 
-        target="_blank"><img alt="" width="800"src="%s.jpg"
 
-          title="" border="0"></a>
-      <br>
-      <br>
-      %s
-      <br>
-      <br>
-'''
-    gen_page.write(((photoline % (title, photo['text'])) ).encode('utf8') )
-
-def download(photo, output, date_format):
+def download(connection, photo, output, date_format):
     """Download photo
 
     :param photo:
@@ -233,13 +247,9 @@ def download(photo, output, date_format):
     title = '%s_%s' % (formatted_date, photo['id'])
     path = os.path.join(output, '%s.jpg' % title)
     need_download = not os.path.isfile(path)
-    #print(path, need_download)
+    write_gen(connection, photo, title)
     if need_download:
         r = requests.get(url)
-    #print(photo)
-    write_gen(photo, title)
-    #print("text: %s" % photo['text'])
-    if need_download:
         with open(path, 'wb') as f:
             for buf in r.iter_content(1024):
                 if buf:
