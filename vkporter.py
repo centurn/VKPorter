@@ -17,8 +17,6 @@
     :copyright: (c) 2013 by Andrey Maksimov.
     :license: BSD, see LICENSE for more details.
 """
-from string import Template
-
 __author__ = 'Andrey Maksimov <meamka@me.com>, Mr. Vice-Versa'
 __date__ = '15.06.2015'
 __version__ = '0.2.1'
@@ -31,6 +29,8 @@ import os
 import time
 import sys
 import templates
+from string import Template
+import traceback
 
 try:
     import requests
@@ -78,7 +78,6 @@ def get_user_id(connection, step=0, max_step=2):
             print step, user_id, connection.settings.all
         step = step + 1
         return get_user_id(connection, step=step)
-
 
 def connect(login, password, owner_id=None):
     """Initialize connection with `vk.com <https://vk.com>`_ and try to authorize user with given credentials.
@@ -227,12 +226,17 @@ def get_comments(connection, photo_id):
 
 def write_gen(connection, photo, title):
     global gen_page
-    gen_page.write((templates.photoline % (title, photo['text'])).encode('utf8') )
+    gen_page.write((Template(templates.photoline).substitute(title=title, text=photo['text'])).encode('utf8') )
     comments = get_comments(connection, photo['id'])
     if len(comments['items']) > 0:
         gen_page.write(Template(templates.comments_begin).substitute(num=len(comments['items'])).encode('utf8'))
         for comment in comments['items']:
-            gen_page.write(Template(templates.comment_text).substitute(text=comment['text']).encode('utf8'))
+            from_id = comment['from_id']
+            author = next(x for x in comments['profiles'] if x['id'] == from_id)
+            gen_page.write(Template(templates.comment_text).substitute(
+                    text=comment['text'],
+                    author_name=author['first_name'],
+                    author_family=author['last_name']).encode('utf8'))
         gen_page.write(templates.comments_end)
 
 
@@ -354,6 +358,7 @@ if __name__ == '__main__':
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         print(e)
+        traceback.print_exc()
         print(exc_type, fname, exc_tb.tb_lineno)
 
         sys.exit(1)

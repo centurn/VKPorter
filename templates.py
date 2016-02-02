@@ -21,12 +21,12 @@ header = """<!DOCTYPE html>
 """
 
 photoline = '''
-    <a href=""
+    <a href="$title.jpg"
 
-    target="_blank"><img alt="" width="800"src="%s.jpg"
+    target="_blank"><img alt="" width="800"src="$title.jpg"
 
       title="" border="0"></a><br>
-    %s
+    $text
     <br>
     <br>
 '''
@@ -41,7 +41,8 @@ comments_begin = '''
     <div class="inner" style="display:none;">
 '''
 
-comment_text = '''
+comment_text = '''<br>
+        <b>$author_name $author_family</b><br>
         &nbsp;&nbsp;&nbsp;&nbsp$text
         <br>
 '''
