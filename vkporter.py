@@ -29,7 +29,6 @@ import os
 import time
 import sys
 import templates
-from string import Template
 import traceback
 
 try:
@@ -118,15 +117,30 @@ gen_page = None
 
 
 def gen_header(album, output):
-    global gen_page
-#    print(album)
     gen_page = open(os.path.join(output, 'generated.html'), 'w')
     gen_page.write((templates.header % album['title']).encode('utf8'))
+    return gen_page
 
 
-def gen_footer():
+def gen_footer(gen_page):
     gen_page.write(templates.footer)
     gen_page.close()
+
+
+def write_gen(gen_page, connection, photo, title):
+    gen_page.write((templates.photoline.substitute(title=title, text=photo['text'])).encode('utf8') )
+    comments = get_comments(connection, photo['id'])
+    if len(comments['items']) > 0:
+        gen_page.write(templates.comments_begin.substitute(num=len(comments['items'])).encode('utf8'))
+        profiles = comments['profiles']
+        for comment in comments['items']:
+            from_id = comment['from_id']
+            author = next(x for x in profiles if x['id'] == from_id)
+            gen_page.write(templates.comment_text.substitute(
+                    text=comment['text'],
+                    author_name=author['first_name'],
+                    author_family=author['last_name']).encode('utf8'))
+        gen_page.write(templates.comments_end)
 
 
 def download_album(connection, output_path, date_format, album, prev_s_len=0):
@@ -139,7 +153,7 @@ def download_album(connection, output_path, date_format, album, prev_s_len=0):
     if not os.path.exists(output):
         os.makedirs(output)
 
-    gen_header(album, output)
+    gen_page = gen_header(album, output)
 
     photos_count = response['count']
     photos = response['items']
@@ -155,14 +169,14 @@ def download_album(connection, output_path, date_format, album, prev_s_len=0):
         prev_s_len = len(output_s)
         sys.stdout.flush()
 
-        download(connection, photo, output, date_format)
+        download(connection, photo, output, date_format, gen_page)
         processed += 1
 
         # crazy hack to prevent vk.com "Max retries exceeded" error
         # pausing download process every 50 photos
         if processed % 50 == 0:
             time.sleep(1)
-    gen_footer()
+    gen_footer(gen_page)
 
 
 def get_user_photos(connection):
@@ -224,23 +238,7 @@ def get_comments(connection, photo_id):
         return None
 
 
-def write_gen(connection, photo, title):
-    global gen_page
-    gen_page.write((Template(templates.photoline).substitute(title=title, text=photo['text'])).encode('utf8') )
-    comments = get_comments(connection, photo['id'])
-    if len(comments['items']) > 0:
-        gen_page.write(Template(templates.comments_begin).substitute(num=len(comments['items'])).encode('utf8'))
-        for comment in comments['items']:
-            from_id = comment['from_id']
-            author = next(x for x in comments['profiles'] if x['id'] == from_id)
-            gen_page.write(Template(templates.comment_text).substitute(
-                    text=comment['text'],
-                    author_name=author['first_name'],
-                    author_family=author['last_name']).encode('utf8'))
-        gen_page.write(templates.comments_end)
-
-
-def download(connection, photo, output, date_format):
+def download(connection, photo, output, date_format, gen_page):
     """Download photo
 
     :param photo:
@@ -251,7 +249,7 @@ def download(connection, photo, output, date_format):
     title = '%s_%s' % (formatted_date, photo['id'])
     path = os.path.join(output, '%s.jpg' % title)
     need_download = not os.path.isfile(path)
-    write_gen(connection, photo, title)
+    write_gen(gen_page, connection, photo, title)
     if need_download:
         r = requests.get(url)
         with open(path, 'wb') as f:
