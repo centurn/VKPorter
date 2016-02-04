@@ -3,11 +3,11 @@
 
 from string import Template
 
-header = """<!DOCTYPE html>
+header = Template("""<!DOCTYPE html>
 <html>
   <head>
     <meta content="text/html; charset=UTF-8" http-equiv="content-type">
-    <title>%s</title>
+    <title>$title</title>
     <script type="text/javascript">
     function showSpoiler(obj)
     {
@@ -20,7 +20,7 @@ header = """<!DOCTYPE html>
     </script>
   </head>
   <body>
-"""
+""")
 
 photoline = Template('''
     <a href="$title.jpg"
@@ -43,9 +43,11 @@ comments_begin = Template('''
     <div class="inner" style="display:none;">
 ''')
 
-comment_text = Template('''<br>
+author_line = Template('''<br>
         <b>$author_name $author_family</b><br>
-        &nbsp;&nbsp;&nbsp;&nbsp$text
+''')
+
+comment_text = Template('''&nbsp;&nbsp;&nbsp;&nbsp$text
         <br>
 ''')
 

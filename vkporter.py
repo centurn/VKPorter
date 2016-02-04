@@ -113,12 +113,10 @@ def get_albums(connection):
         print(e)
         return None
 
-gen_page = None
-
 
 def gen_header(album, output):
     gen_page = open(os.path.join(output, 'generated.html'), 'w')
-    gen_page.write((templates.header % album['title']).encode('utf8'))
+    gen_page.write(templates.header.substitute(title=album['title']).encode('utf8'))
     return gen_page
 
 
@@ -127,19 +125,23 @@ def gen_footer(gen_page):
     gen_page.close()
 
 
+def write_author(gen_page, profiles, from_id):
+    author = next(x for x in profiles if x['id'] == from_id)
+    gen_page.write(templates.author_line.substitute(
+            author_name=author['first_name'],
+            author_family=author['last_name']).encode('utf8'))
+
+
 def write_gen(gen_page, connection, photo, title):
-    gen_page.write((templates.photoline.substitute(title=title, text=photo['text'])).encode('utf8') )
+    gen_page.write((templates.photoline.substitute(title=title, text=photo['text'])).encode('utf8'))
     comments = get_comments(connection, photo['id'])
     if len(comments['items']) > 0:
         gen_page.write(templates.comments_begin.substitute(num=len(comments['items'])).encode('utf8'))
         profiles = comments['profiles']
         for comment in comments['items']:
-            from_id = comment['from_id']
-            author = next(x for x in profiles if x['id'] == from_id)
+            write_author(gen_page, profiles, comment['from_id'])
             gen_page.write(templates.comment_text.substitute(
-                    text=comment['text'],
-                    author_name=author['first_name'],
-                    author_family=author['last_name']).encode('utf8'))
+                    text=comment['text']).encode('utf8'))
         gen_page.write(templates.comments_end)
 
 
@@ -238,6 +240,30 @@ def get_comments(connection, photo_id):
         return None
 
 
+def get_wall(connection):
+    try:
+        result = {'items': [], 'profiles': []}
+
+        while True:
+            temp = connection.method(
+                'wall.get',
+                    {'owner_id': connection.owner_id,
+                     'extended': 1,
+                     'offset': len(result['items']),
+                     'count': 100
+                     }
+            )
+            if len(temp['items']) == 0:
+                break
+            result['items'] += temp['items']
+            result['profiles'] += temp['profiles']
+
+        return result
+    except Exception as e:
+        print(e)
+        return None
+
+
 def download(connection, photo, output, date_format, gen_page):
     """Download photo
 
@@ -272,6 +298,23 @@ def sizeof_fmt(num):
         num /= 1024.0
 
 
+def save_wall(connection, output_path ):
+    wall = get_wall(connection)
+    output = os.path.join(output_path, 'wall')
+    if not os.path.exists(output):
+        os.makedirs(output)
+    gen_page = open(os.path.join(output, 'generated.html'), 'w')
+    gen_page.write(templates.header.substitute(title=u'Стена').encode('utf8'))
+
+    profiles = wall['profiles']
+    for item in wall['items']:
+        write_author(gen_page, profiles, item['from_id'])
+        gen_page.write(templates.comment_text.substitute(
+                text=item['text']).encode('utf8'))
+
+    gen_page.write(templates.footer)
+    gen_page.close()
+
 if __name__ == '__main__':
 
     # Connect to vk.com
@@ -290,6 +333,8 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--date_format', help='for photo title', default='%Y%m%d@%H%M')
     parser.add_argument('-a', '--album_id', help='dowload a particular album. Additional values: wall, profile, saved, user')
     parser.add_argument('-id', '--owner_id', help='User ID')
+    parser.add_argument('-w', '--wall', action='store_true', help='Save wall contents (only)')
+    parser.add_argument('-b', '--backup', action='store_true', help='Make full backup (save photos, wall, generate html)')
 
     args = parser.parse_args()
 
@@ -311,12 +356,17 @@ if __name__ == '__main__':
             print(error_msg)
             sys.exit()
 
-        # dowload a particular album
-        # Request list of photo albums
-        albums_response = get_albums(connection)
-        albums_count = albums_response['count']
-        albums = albums_response['items']
+        if args.wall or args.backup:
+            save_wall(connection, args.output)
+
+        if not args.wall or args.backup:
+            # Request list of photo albums
+            albums_response = get_albums(connection)
+            albums_count = albums_response['count']
+            albums = albums_response['items']
+
         if args.album_id:
+            # dowload a particular album
             #find album title
             album = None
             for i in albums:
@@ -329,7 +379,7 @@ if __name__ == '__main__':
 
             download_album(connection, args.output, args.date_format, album)
         # download all albums
-        else:
+        elif args.backup:
             all_photos_count = 0
 
             print '\n'
