@@ -31,6 +31,10 @@ import sys
 import templates
 import traceback
 
+# According to API doc, they return maximum 100 in getComments and getWall
+# We request 100 and assume that if less is returned then there's no more left
+items_per_request = 100
+
 try:
     import requests
 except ImportError:
@@ -132,17 +136,20 @@ def write_author(gen_page, profiles, from_id):
             author_family=author['last_name']).encode('utf8'))
 
 
-def write_gen(gen_page, connection, photo, title):
-    gen_page.write((templates.photoline.substitute(title=title, text=photo['text'])).encode('utf8'))
-    comments = get_comments(connection, photo['id'])
-    if len(comments['items']) > 0:
-        gen_page.write(templates.comments_begin.substitute(num=len(comments['items'])).encode('utf8'))
-        profiles = comments['profiles']
-        for comment in comments['items']:
+def write_comments(gen_page, items, profiles):
+    if len(items) > 0:
+        gen_page.write(templates.comments_begin.substitute(num=len(items)).encode('utf8'))
+        for comment in items:
             write_author(gen_page, profiles, comment['from_id'])
             gen_page.write(templates.comment_text.substitute(
                     text=comment['text']).encode('utf8'))
         gen_page.write(templates.comments_end)
+
+
+def write_gen(gen_page, connection, photo, title):
+    gen_page.write((templates.photoline.substitute(title=title, text=photo['text'])).encode('utf8'))
+    comments, profiles = get_comments(connection, photo['id'], False)
+    write_comments(gen_page, comments, profiles)
 
 
 def download_album(connection, output_path, date_format, album, prev_s_len=0):
@@ -216,52 +223,64 @@ def get_photos(connection, album_id):
         return None
 
 
-def get_comments(connection, photo_id):
+def get_comments(connection, item_id, is_wall):
     """Get comments list for specified photo.
 
     :param connection: :class:`vk_api.vk_api.VkApi` connection
     :type connection: :class:`vk_api.vk_api.VkApi`
-    :param photo_id: album identifier returned by :func:`get_photos`
-    :type photo_id: int
+    :param item_id: album identifier returned by :func:`get_photos` or 'get_wall'
+    :param is_wall: True for getting comments of wall post, false for comments for photo
+    :type item_id: int
 
     :return: list of comments or ``None``
     :rtype: list
     """
     try:
-        return connection.method(
-            'photos.getComments',
-                {'photo_id': photo_id,
-                 'owner_id': connection.owner_id,
-                 'extended': 1
-                 }
-        )
+        items = []
+        profiles = []
+        while True:
+            temp = connection.method(
+                    'wall.getComments' if is_wall else 'photos.getComments',
+                    {('post_id' if is_wall else 'photo_id'): item_id,
+                     'owner_id': connection.owner_id,
+                     'extended': 1,
+                     'offset': len(items),
+                     'count': items_per_request
+                     }
+            )
+            items += temp['items']
+            profiles += temp['profiles']
+            if len(temp['items']) != items_per_request:
+                break
+        return items, profiles
     except Exception as e:
         print(e)
-        return None
+        return None, None
 
 
 def get_wall(connection):
     try:
-        result = {'items': [], 'profiles': []}
-
+        items = []
+        profiles = []
         while True:
             temp = connection.method(
                 'wall.get',
                     {'owner_id': connection.owner_id,
                      'extended': 1,
-                     'offset': len(result['items']),
-                     'count': 100
+                     'offset': len(items),
+                     'count': items_per_request
                      }
             )
             if len(temp['items']) == 0:
                 break
-            result['items'] += temp['items']
-            result['profiles'] += temp['profiles']
+            items += temp['items']
+            profiles += temp['profiles']
 
-        return result
+        return items, profiles
     except Exception as e:
         print(e)
-        return None
+        return None, None
+
 
 
 def download(connection, photo, output, date_format, gen_page):
@@ -299,18 +318,19 @@ def sizeof_fmt(num):
 
 
 def save_wall(connection, output_path ):
-    wall = get_wall(connection)
+    items, profiles = get_wall(connection)
     output = os.path.join(output_path, 'wall')
     if not os.path.exists(output):
         os.makedirs(output)
     gen_page = open(os.path.join(output, 'generated.html'), 'w')
     gen_page.write(templates.header.substitute(title=u'Стена').encode('utf8'))
 
-    profiles = wall['profiles']
-    for item in wall['items']:
+    for item in items:
         write_author(gen_page, profiles, item['from_id'])
         gen_page.write(templates.comment_text.substitute(
                 text=item['text']).encode('utf8'))
+        comments, comment_profiles = get_comments(connection, item['id'], True)
+        write_comments(gen_page, comments, comment_profiles)
 
     gen_page.write(templates.footer)
     gen_page.close()

@@ -40,7 +40,7 @@ footer = """  </body>
 comments_begin = Template('''
     <div class="spoiler">
     <input type="button" onclick="showSpoiler(this);" value="Show/Hide $num comments" />
-    <div class="inner" style="display:none;">
+    <div class="inner" style="display:none;padding-left:5%">
 ''')
 
 author_line = Template('''<br>
@@ -52,5 +52,6 @@ comment_text = Template('''&nbsp;&nbsp;&nbsp;&nbsp$text
 ''')
 
 comments_end = '''
+    </div>
     </div><br>
     <br>'''
