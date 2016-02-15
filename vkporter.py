@@ -178,7 +178,8 @@ def download_album(connection, output_path, date_format, album, prev_s_len=0):
         prev_s_len = len(output_s)
         sys.stdout.flush()
 
-        download(connection, photo, output, date_format, gen_page)
+        title = download_photo(connection, photo, output, date_format)
+        write_gen(gen_page, connection, photo, title)
         processed += 1
 
         # crazy hack to prevent vk.com "Max retries exceeded" error
@@ -283,7 +284,7 @@ def get_wall(connection):
 
 
 
-def download(connection, photo, output, date_format, gen_page):
+def download_photo(connection, photo, output, date_format):
     """Download photo
 
     :param photo:
@@ -294,13 +295,13 @@ def download(connection, photo, output, date_format, gen_page):
     title = '%s_%s' % (formatted_date, photo['id'])
     path = os.path.join(output, '%s.jpg' % title)
     need_download = not os.path.isfile(path)
-    write_gen(gen_page, connection, photo, title)
     if need_download:
         r = requests.get(url)
         with open(path, 'wb') as f:
             for buf in r.iter_content(1024):
                 if buf:
                     f.write(buf)
+    return title
 
 
 def sizeof_fmt(num):
@@ -317,18 +318,44 @@ def sizeof_fmt(num):
         num /= 1024.0
 
 
-def save_wall(connection, output_path ):
+def save_wall(connection, output_path, date_format):
     items, profiles = get_wall(connection)
     output = os.path.join(output_path, 'wall')
     if not os.path.exists(output):
         os.makedirs(output)
     gen_page = open(os.path.join(output, 'generated.html'), 'w')
     gen_page.write(templates.header.substitute(title=u'Стена').encode('utf8'))
+    processed = 0
+    total = len(items)
+    prev_s_len = 0
 
     for item in items:
+        percent = round(float(processed) / float(total) * 100, 2)
+        output_s = "\rExporting wall... %s of %s items (%2d%%)" % (processed, total, percent)
+        # Pad with spaces to clear the previous line's tail.
+        # It's ok to multiply by negative here.
+        output_s += ' '*(prev_s_len - len(output_s))
+        sys.stdout.write(output_s)
+        prev_s_len = len(output_s)
+        sys.stdout.flush()
+        processed += 1
+
         write_author(gen_page, profiles, item['from_id'])
         gen_page.write(templates.comment_text.substitute(
                 text=item['text']).encode('utf8'))
+        attachments = item.get('attachments')
+        if attachments and len(attachments) > 0:
+            gen_page.write(templates.wall_photo_begin)
+            count = 0
+            for attach in attachments:
+                count += 1
+                if count % 5 == 0:
+                    gen_page.write(templates.wall_photo_newline)
+                if attach['type'] == 'photo':
+                    title = download_photo(connection, attach['photo'], output, date_format)
+                    gen_page.write(templates.wall_photo_content.substitute(
+                            title=title).encode('utf8'))
+            gen_page.write(templates.wall_photo_end)
         comments, comment_profiles = get_comments(connection, item['id'], True)
         write_comments(gen_page, comments, comment_profiles)
 
@@ -377,7 +404,7 @@ if __name__ == '__main__':
             sys.exit()
 
         if args.wall or args.backup:
-            save_wall(connection, args.output)
+            save_wall(connection, args.output, args.date_format)
 
         if not args.wall or args.backup:
             # Request list of photo albums

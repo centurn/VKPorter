@@ -55,3 +55,26 @@ comments_end = '''
     </div>
     </div><br>
     <br>'''
+
+wall_photo_begin = '''
+    <div id="image-table" style="width:85%">
+        <table>
+            <tr>
+'''
+
+wall_photo_content = Template('''
+            <td style="padding:4px">
+                <img src="$title.jpg" width="100%">
+              </td>
+''')
+
+wall_photo_newline = '''
+            <tr>
+            </tr>
+'''
+
+wall_photo_end = '''
+            </tr>
+        </table>
+    </div>
+'''
