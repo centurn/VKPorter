@@ -129,18 +129,22 @@ def gen_footer(gen_page):
     gen_page.close()
 
 
-def write_author(gen_page, profiles, from_id):
+def write_author(gen_page, profiles, item):
+    from_id = item['from_id']
     author = next(x for x in profiles if x['id'] == from_id)
+    formatted_date = datetime.datetime.fromtimestamp(item['date']).strftime(templates.date_format_posts)
+
     gen_page.write(templates.author_line.substitute(
             author_name=author['first_name'],
-            author_family=author['last_name']).encode('utf8'))
+            author_family=author['last_name'],
+            date=formatted_date).encode('utf8'))
 
 
 def write_comments(gen_page, items, profiles):
-    if len(items) > 0:
+    if items and len(items) > 0:
         gen_page.write(templates.comments_begin.substitute(num=len(items)).encode('utf8'))
         for comment in items:
-            write_author(gen_page, profiles, comment['from_id'])
+            write_author(gen_page, profiles, comment)
             gen_page.write(templates.comment_text.substitute(
                     text=comment['text']).encode('utf8'))
         gen_page.write(templates.comments_end)
@@ -289,7 +293,8 @@ def download_photo(connection, photo, output, date_format):
 
     :param photo:
     """
-    url = photo.get('photo_2560') or photo.get('photo_1280') or photo.get('photo_807') or photo.get('photo_604') or photo.get('photo_130')
+    #url = photo.get('photo_2560') or photo.get('photo_1280') or photo.get('photo_807') or photo.get('photo_604') or photo.get('photo_130')
+    url = photo.get('photo_807') or photo.get('photo_604') or photo.get('photo_130') or photo.get('photo_2560') or photo.get('photo_1280') or photo.get('photo_807') or photo.get('photo_604') or photo.get('photo_130')
 
     formatted_date = datetime.datetime.fromtimestamp(photo['date']).strftime(date_format)
     title = '%s_%s' % (formatted_date, photo['id'])
@@ -340,7 +345,7 @@ def save_wall(connection, output_path, date_format):
         sys.stdout.flush()
         processed += 1
 
-        write_author(gen_page, profiles, item['from_id'])
+        write_author(gen_page, profiles, item)
         gen_page.write(templates.comment_text.substitute(
                 text=item['text']).encode('utf8'))
         attachments = item.get('attachments')

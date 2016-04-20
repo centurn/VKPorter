@@ -25,7 +25,7 @@ header = Template("""<!DOCTYPE html>
 photoline = Template('''
     <a href="$title.jpg"
 
-    target="_blank"><img alt="" width="800"src="$title.jpg"
+    target="_blank"><img alt="" width="807"src="$title.jpg"
 
       title="" border="0"></a><br>
     $text
@@ -44,7 +44,7 @@ comments_begin = Template('''
 ''')
 
 author_line = Template('''<br>
-        <b>$author_name $author_family</b><br>
+        <b>$author_name $author_family</b> $date<br>
 ''')
 
 comment_text = Template('''&nbsp;&nbsp;&nbsp;&nbsp$text
@@ -78,3 +78,5 @@ wall_photo_end = '''
         </table>
     </div>
 '''
+
+date_format_posts = '%Y-%m-%d  %H:%M'
