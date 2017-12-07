@@ -131,13 +131,22 @@ def gen_footer(gen_page):
 
 def write_author(gen_page, profiles, item):
     from_id = item['from_id']
-    author = next(x for x in profiles if x['id'] == from_id)
+    author = next((x for x in profiles if x['id'] == from_id), None)
     formatted_date = datetime.datetime.fromtimestamp(item['date']).strftime(templates.date_format_posts)
 
-    gen_page.write(templates.author_line.substitute(
-            author_name=author['first_name'],
-            author_family=author['last_name'],
-            date=formatted_date).encode('utf8'))
+    # Sometimes, from_id is negative. And therefore, author can't be found.
+    # Looks like that means it's Group, not individual.
+    # TODO: maybe add proper handling of groups here (need to pass necessary info)
+    if author is None:
+        gen_page.write(templates.author_line.substitute(
+                author_name='Unknown (group). id: ' + str(from_id),
+                author_family='',
+                date=formatted_date).encode('utf8'))
+    else:
+        gen_page.write(templates.author_line.substitute(
+                author_name=author['first_name'],
+                author_family=author['last_name'],
+                date=formatted_date).encode('utf8'))
 
 
 def write_comments(gen_page, items, profiles):
