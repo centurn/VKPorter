@@ -1,7 +1,8 @@
-VKPorter
-========
+VKPorter - backup script
+========================
 
-Extremely small tool to export photo albums from [vk.com](https://vk.com).
+Script to back up vk.com alums&wall&comments - based on fork http://meamka.me/VKPorter/
+Generates html for each album and for wall, including posts, descriptions, and comments
 
 
 ## Prerequisites
@@ -20,20 +21,21 @@ Before you can start using VKPorter you have to install some python libraries if
 
 Synopsis:
 
-    $ vkporter.py [-h] [-v] [-o OUTPUT] username
+    $ vkporter.py [-h] [-v] [-b] [-a] [-w] [-o OUTPUT] username
 
 See also `vkporter --help`.
 
 ### Examples
 
-    $ vkporter.py username password
-    
-photo albums will be exported to `./exported`.
+$python2.7 vkporter.py -o ../target_dir username -id <numerical vk id> -b
 
-    $ vkporter.py -o ~/Documents/Exported username
-    
-photo albums will be exported to `~/Documents/Exported`.
+Back up everything (1 folder for each album and for wall)
 
+$python2.7 vkporter.py -o ../target_dir username -id <numerical vk id> -a <album id>
 
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/amka/vkporter/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+Generate html and download photos for specific album
+
+$python2.7 vkporter.py -o ../target_dir username -id <numerical vk id> -w
+
+Export wall (only)
 
